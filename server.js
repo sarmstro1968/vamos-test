@@ -112,6 +112,30 @@ async function handleProcess(req, res, url) {
   });
 }
 
+function cleanPhone(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  const digits = text.replace(/\D/g, '');
+  if (text.charAt(0) === '+' && digits.length >= 8 && digits.length <= 15) return '+' + digits;
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits.charAt(0) === '1') return '+' + digits;
+  return null;
+}
+
+async function handleNewContact(req, res) {
+  const body = await readJson(req);
+  const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+  const email = String(body.email || '').trim().toLowerCase();
+  const company = String(body.company || '').trim().replace(/\s+/g, ' ');
+  const phone = cleanPhone(body.phone);
+  if (name.length < 2 || name.length > 100) return send(res, 400, { error: 'Enter the contact\'s name.' });
+  if (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 400, { error: 'Enter a valid email address.' });
+  if (phone === null) return send(res, 400, { error: 'Enter a 10-digit phone number, or leave it blank.' });
+  if (company.length > 150) return send(res, 400, { error: 'Business name is too long.' });
+  const result = await crm.createContact({ name: name, email: email, phone: phone, company: company });
+  send(res, 200, result);
+}
+
 async function handleConfirm(req, res) {
   const body = await readJson(req);
   const macro = MACROS.find(function (m) { return m.id === body.macroId; });
@@ -148,6 +172,7 @@ const server = http.createServer(async function (req, res) {
       if (q.length < 2) return send(res, 200, { contacts: [] });
       return send(res, 200, { contacts: await crm.searchContacts(q) });
     }
+    if (req.method === 'POST' && url.pathname === '/api/contacts') return await handleNewContact(req, res);
     if (req.method === 'POST' && url.pathname === '/api/process') return await handleProcess(req, res, url);
     if (req.method === 'POST' && url.pathname === '/api/confirm') return await handleConfirm(req, res);
     return send(res, 404, { error: 'Not found' });

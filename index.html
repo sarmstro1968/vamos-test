@@ -24,13 +24,14 @@ main{max-width:560px;margin:0 auto;padding:16px 16px 48px}
 .step{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 h2{font-size:18px;margin:0 0 10px}
 label{display:block;font-weight:600;margin-bottom:6px}
-input[type=text],input[type=password],input[type=search]{width:100%;font:inherit;padding:13px 12px;border:1.5px solid #8A96A8;border-radius:10px;background:#fff;color:var(--ink)}
+input[type=text],input[type=password],input[type=search],input[type=email],input[type=tel]{width:100%;font:inherit;padding:13px 12px;border:1.5px solid #8A96A8;border-radius:10px;background:#fff;color:var(--ink)}
 input:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #7FA4FF;outline-offset:2px}
 button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:14px 16px;min-height:48px;cursor:pointer;background:var(--ink);color:#fff}
 button.go{background:var(--go)}button.go:active{background:var(--go-dark)}
 button.plain{background:#E6EAF0;color:var(--ink)}
 button.stop{background:var(--bad)}
 button:disabled{opacity:.45;cursor:not-allowed}
+.field{margin-bottom:12px}.opt{font-weight:400;color:var(--muted)}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1 1 140px}
 .muted{color:var(--muted);font-size:14px}
 .list{margin:10px 0 0;padding:0;list-style:none}
@@ -84,11 +85,21 @@ progress{width:100%;height:10px}
 <input id="q" type="search" placeholder="Name, email or phone" autocomplete="off">
 <p id="searchMsg" class="muted" role="status"></p>
 <ul id="results" class="list"></ul>
+<button id="newBtn" class="plain" type="button">Add a new contact</button>
 </div>
+<form id="newForm" hidden novalidate>
+<div class="field"><label for="nName">Name</label><input id="nName" type="text" autocomplete="off" autocapitalize="words" required></div>
+<div class="field"><label for="nEmail">Email</label><input id="nEmail" type="email" autocomplete="off" autocapitalize="none" inputmode="email" required></div>
+<div class="field"><label for="nPhone">Phone <span class="opt">(optional)</span></label><input id="nPhone" type="tel" autocomplete="off" inputmode="tel"></div>
+<div class="field"><label for="nCompany">Business name <span class="opt">(optional)</span></label><input id="nCompany" type="text" autocomplete="off" autocapitalize="words"></div>
+<div id="newMsg" class="note bad" role="alert" hidden></div>
+<div class="row" style="margin-top:12px"><button id="newSave" class="go" type="submit">Save contact</button><button id="newCancel" class="plain" type="button">Cancel</button></div>
+</form>
 <div id="picked" class="picked" hidden>
 <div><strong id="pickedName"></strong><span id="pickedSub" class="muted"></span></div>
 <button id="change" class="plain" type="button">Change</button>
 </div>
+<p id="pickedMsg" class="muted" role="status"></p>
 </section>
 
 <section class="card" id="consentCard">
@@ -210,10 +221,36 @@ progress{width:100%;height:10px}
     contact = c;
     $('pickedName').textContent = c.name;
     $('pickedSub').textContent = [c.email, c.phone].filter(Boolean).join(' · ');
-    show($('searchBox'), !c); show($('picked'), !!c);
+    show($('searchBox'), !c); show($('picked'), !!c); show($('newForm'), false);
+    $('pickedMsg').textContent = '';
     ready();
   }
-  $('change').addEventListener('click', function () { contact = null; show($('searchBox'), true); show($('picked'), false); ready(); $('q').focus(); });
+  $('change').addEventListener('click', function () { contact = null; show($('searchBox'), true); show($('picked'), false); $('pickedMsg').textContent = ''; ready(); $('q').focus(); });
+
+  // ---- step 1b: add a contact that is not in the CRM yet
+  $('newBtn').addEventListener('click', function () {
+    var q = $('q').value.trim();
+    $('nName').value = ''; $('nEmail').value = ''; $('nPhone').value = ''; $('nCompany').value = '';
+    if (q.indexOf('@') > 0) $('nEmail').value = q;
+    else if (/^[\d\s()+.-]{7,}$/.test(q)) $('nPhone').value = q;
+    else $('nName').value = q;
+    show($('newMsg'), false); show($('searchBox'), false); show($('newForm'), true);
+    ($('nName').value ? $('nEmail') : $('nName')).focus();
+  });
+  $('newCancel').addEventListener('click', function () { show($('newForm'), false); show($('searchBox'), true); });
+  $('newForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var body = { name: $('nName').value, email: $('nEmail').value, phone: $('nPhone').value, company: $('nCompany').value };
+    $('newSave').disabled = true; $('newSave').textContent = 'Saving…'; show($('newMsg'), false);
+    api('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (d) {
+        $('q').value = ''; $('results').textContent = ''; $('searchMsg').textContent = '';
+        pick(d.contact);
+        $('pickedMsg').textContent = d.existing ? 'Already in your CRM, so the existing contact was selected. Nothing was changed.' : 'New contact added to your CRM.';
+      })
+      .catch(function (e) { $('newMsg').textContent = e.message; show($('newMsg'), true); })
+      .then(function () { $('newSave').disabled = false; $('newSave').textContent = 'Save contact'; });
+  });
 
   // ---- step 2: consent
   $('consent').addEventListener('change', ready);
