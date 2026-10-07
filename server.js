@@ -20,6 +20,16 @@ const NOTE_CHUNK = 50000;
 const MACROS = JSON.parse(fs.readFileSync(path.join(__dirname, 'macros.json'), 'utf8'));
 const INDEX = fs.readFileSync(path.join(__dirname, 'index.html'));
 
+// Home-screen install files (icon and app manifest). Fixed list, nothing else is served.
+const STATIC = {
+  '/manifest.webmanifest': 'application/manifest+json',
+  '/icon-192.png': 'image/png',
+  '/icon-512.png': 'image/png',
+  '/apple-touch-icon.png': 'image/png'
+};
+const STATIC_FILES = {};
+for (const name of Object.keys(STATIC)) STATIC_FILES[name] = fs.readFileSync(path.join(__dirname, 'public', name));
+
 function send(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -119,6 +129,10 @@ const server = http.createServer(async function (req, res) {
     if (req.method === 'GET' && url.pathname === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end(INDEX);
+    }
+    if (req.method === 'GET' && STATIC[url.pathname]) {
+      res.writeHead(200, { 'Content-Type': STATIC[url.pathname], 'Cache-Control': 'public, max-age=3600' });
+      return res.end(STATIC_FILES[url.pathname]);
     }
     if (req.method === 'GET' && url.pathname === '/healthz') return send(res, 200, { ok: true });
     if (!url.pathname.startsWith('/api/')) return send(res, 404, { error: 'Not found' });
