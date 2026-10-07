@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1424">
+<title>VAMOS</title>
+<style>
+:root{--navy:#0B1424;--ink:#0F1B2D;--muted:#4A5568;--line:#D9DEE5;--bg:#F3F5F7;--card:#FFFFFF;--go:#B8410A;--go-dark:#8F3207;--crm:#1746C7;--ok:#17603A;--okbg:#E4F3EA;--bad:#A32020;--badbg:#FBE9E9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+header{background:var(--navy);color:#fff;padding:18px 16px;padding-top:calc(18px + env(safe-area-inset-top))}
+header h1{margin:0;font-size:26px;letter-spacing:-.5px}
+header p{margin:2px 0 0;color:#C7D0DD;font-size:13px}
+main{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.step{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h2{font-size:18px;margin:0 0 10px}
+label{display:block;font-weight:600;margin-bottom:6px}
+input[type=text],input[type=password],input[type=search]{width:100%;font:inherit;padding:13px 12px;border:1.5px solid #8A96A8;border-radius:10px;background:#fff;color:var(--ink)}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #7FA4FF;outline-offset:2px}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:14px 16px;min-height:48px;cursor:pointer;background:var(--ink);color:#fff}
+button.go{background:var(--go)}button.go:active{background:var(--go-dark)}
+button.plain{background:#E6EAF0;color:var(--ink)}
+button.stop{background:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1 1 140px}
+.muted{color:var(--muted);font-size:14px}
+.list{margin:10px 0 0;padding:0;list-style:none}
+.list button{width:100%;text-align:left;background:#fff;color:var(--ink);border:1px solid var(--line);margin-bottom:8px;font-weight:500}
+.list small{display:block;color:var(--muted);font-weight:400}
+.picked{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#EAF0FF;border:1px solid #B9CBF7;border-radius:10px;padding:10px 12px}
+.picked strong{display:block}
+.check{display:flex;gap:12px;align-items:flex-start;font-weight:500}
+.check input{width:24px;height:24px;margin:1px 0 0;flex:none}
+.timer{font:700 44px/1 ui-monospace,Menlo,monospace;text-align:center;margin:8px 0 12px}
+.dot{display:inline-block;width:12px;height:12px;border-radius:6px;background:var(--bad);margin-right:8px;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+.note{border-radius:10px;padding:12px;margin-top:10px;font-size:15px}
+.note.ok{background:var(--okbg);color:var(--ok)}
+.note.bad{background:var(--badbg);color:var(--bad)}
+.note.info{background:#EEF1F5;color:var(--ink)}
+.macro{border:1.5px solid var(--go);border-radius:12px;padding:14px;margin-top:10px}
+.macro h3{margin:0 0 4px;font-size:17px}
+.heard{font-style:italic;color:var(--muted);font-size:14px;margin:6px 0 12px}
+pre{white-space:pre-wrap;word-wrap:break-word;font:14px/1.5 system-ui,sans-serif;margin:10px 0 0;max-height:320px;overflow:auto}
+summary{cursor:pointer;font-weight:600;padding:6px 0}
+progress{width:100%;height:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+<h1>VAMOS</h1>
+<p>Voice Activated Macro Operating System · proof of concept</p>
+</header>
+<main>
+
+<section id="gate" class="card" hidden>
+<h2>Enter passcode</h2>
+<form id="gateForm">
+<label for="pass">Passcode</label>
+<input id="pass" type="password" autocomplete="current-password" required>
+<div id="gateMsg" class="note bad" role="alert" hidden></div>
+<div class="row" style="margin-top:12px"><button class="go" type="submit">Unlock</button></div>
+</form>
+</section>
+
+<div id="app" hidden>
+
+<section class="card" id="contactCard">
+<p class="step">Step 1</p>
+<h2>Select customer</h2>
+<div id="searchBox">
+<label for="q">Search your CRM contacts</label>
+<input id="q" type="search" placeholder="Name, email or phone" autocomplete="off">
+<p id="searchMsg" class="muted" role="status"></p>
+<ul id="results" class="list"></ul>
+</div>
+<div id="picked" class="picked" hidden>
+<div><strong id="pickedName"></strong><span id="pickedSub" class="muted"></span></div>
+<button id="change" class="plain" type="button">Change</button>
+</div>
+</section>
+
+<section class="card" id="consentCard">
+<p class="step">Step 2</p>
+<h2>Recording consent</h2>
+<label class="check"><input id="consent" type="checkbox"><span>Everyone in the room has agreed to this meeting being recorded.</span></label>
+</section>
+
+<section class="card" id="recordCard">
+<p class="step">Step 3</p>
+<h2>Record the meeting</h2>
+<div id="idle">
+<div class="row">
+<button id="start" class="go" type="button" disabled>Start recording</button>
+<button id="uploadBtn" class="plain" type="button" disabled>Upload a recording</button>
+</div>
+<input id="file" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg" hidden>
+<p id="idleMsg" class="muted">Select a customer and confirm consent to begin.</p>
+<details><summary>Macros you can say</summary><ul id="macroList" class="muted"></ul></details>
+</div>
+<div id="live" hidden>
+<div class="timer" aria-live="off"><span class="dot" aria-hidden="true"></span><span id="clock">00:00</span></div>
+<p class="muted">Keep this page open and the screen on until you stop. Locking the phone or switching apps can end the recording.</p>
+<div class="row"><button id="stopBtn" class="stop" type="button">Stop and send</button></div>
+</div>
+<div id="busy" hidden>
+<p id="busyMsg" role="status">Uploading…</p>
+<progress id="bar" max="100" value="0"></progress>
+</div>
+<div id="fail" hidden>
+<div id="failMsg" class="note bad" role="alert"></div>
+<div class="row" style="margin-top:12px">
+<button id="retry" class="go" type="button">Try again</button>
+<a id="save" class="muted" download="vamos-recording" style="align-self:center;text-align:center">Save recording to this phone</a>
+</div>
+</div>
+</section>
+
+<section class="card" id="resultCard" hidden>
+<p class="step">Result</p>
+<h2 id="resultTitle">Done</h2>
+<div id="saveNote"></div>
+<div id="macros"></div>
+<details style="margin-top:12px"><summary>Read the transcript</summary><pre id="transcript"></pre></details>
+<div class="row" style="margin-top:14px"><button id="again" class="plain" type="button">New recording</button></div>
+</section>
+
+</div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var passcode = '';
+  try { passcode = localStorage.getItem('vamos_pass') || ''; } catch (e) {}
+  var contact = null, recorder = null, chunks = [], stream = null, tick = null, startedAt = 0, wake = null, lastBlob = null;
+
+  function show(el, on) { el.hidden = !on; }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'x-vamos-passcode': passcode }, opts.headers || {});
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) { var e = new Error(d.error || ('Request failed (' + r.status + ')')); e.status = r.status; throw e; }
+        return d;
+      });
+    });
+  }
+
+  // ---- passcode gate
+  function unlock() {
+    return api('/api/macros').then(function (d) {
+      show($('gate'), false); show($('app'), true);
+      var ul = $('macroList'); ul.textContent = '';
+      d.macros.forEach(function (m) {
+        var li = document.createElement('li');
+        li.textContent = '"' + m.phrase + '" runs ' + m.label + '. ' + m.description;
+        ul.appendChild(li);
+      });
+    });
+  }
+  function askPass(msg) {
+    show($('app'), false); show($('gate'), true);
+    $('gateMsg').textContent = msg || ''; show($('gateMsg'), !!msg);
+    $('pass').focus();
+  }
+  $('gateForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    passcode = $('pass').value;
+    unlock().then(function () { try { localStorage.setItem('vamos_pass', passcode); } catch (e) {} })
+      .catch(function (e) { askPass(e.status === 401 ? 'That passcode is not right.' : e.message); });
+  });
+  if (passcode) unlock().catch(function () { askPass(''); }); else askPass('');
+
+  // ---- step 1: contact
+  var searchTimer = null;
+  $('q').addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = $('q').value.trim();
+    $('results').textContent = '';
+    if (q.length < 2) { $('searchMsg').textContent = ''; return; }
+    $('searchMsg').textContent = 'Searching…';
+    searchTimer = setTimeout(function () {
+      api('/api/contacts?q=' + encodeURIComponent(q)).then(function (d) {
+        if ($('q').value.trim() !== q) return;
+        $('searchMsg').textContent = d.contacts.length ? '' : 'No contacts found.';
+        d.contacts.forEach(function (c) {
+          var li = document.createElement('li'), b = document.createElement('button'), s = document.createElement('small');
+          b.type = 'button'; b.textContent = c.name;
+          s.textContent = [c.email, c.phone].filter(Boolean).join(' · ') || 'No email or phone on file';
+          b.appendChild(s);
+          b.addEventListener('click', function () { pick(c); });
+          li.appendChild(b); $('results').appendChild(li);
+        });
+      }).catch(function (e) { $('searchMsg').textContent = e.message; });
+    }, 300);
+  });
+  function pick(c) {
+    contact = c;
+    $('pickedName').textContent = c.name;
+    $('pickedSub').textContent = [c.email, c.phone].filter(Boolean).join(' · ');
+    show($('searchBox'), !c); show($('picked'), !!c);
+    ready();
+  }
+  $('change').addEventListener('click', function () { contact = null; show($('searchBox'), true); show($('picked'), false); ready(); $('q').focus(); });
+
+  // ---- step 2: consent
+  $('consent').addEventListener('change', ready);
+  function ready() {
+    var ok = !!contact && $('consent').checked;
+    $('start').disabled = !ok; $('uploadBtn').disabled = !ok;
+    $('idleMsg').textContent = ok ? 'Ready. Say a macro phrase during the meeting to queue an automation.'
+      : 'Select a customer and confirm consent to begin.';
+  }
+
+  // ---- step 3: record or upload
+  function mode(name) { ['idle', 'live', 'busy', 'fail'].forEach(function (n) { show($(n), n === name); }); }
+  function fmt(s) { var m = Math.floor(s / 60), r = s % 60; return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
+
+  $('start').addEventListener('click', function () {
+    if (!navigator.mediaDevices || !window.MediaRecorder) { failed('This browser cannot record. Use "Upload a recording" instead.', null); return; }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+      stream = s; chunks = [];
+      var type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].filter(function (t) { return MediaRecorder.isTypeSupported(t); })[0];
+      recorder = type ? new MediaRecorder(s, { mimeType: type, audioBitsPerSecond: 48000 }) : new MediaRecorder(s);
+      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = function () {
+        clearInterval(tick); releaseWake();
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        var blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        chunks = [];
+        if (!blob.size) { failed('Nothing was recorded. Please try again.', null); return; }
+        sendAudio(blob);
+      };
+      recorder.start(1000);
+      startedAt = Date.now(); $('clock').textContent = '00:00';
+      tick = setInterval(function () { $('clock').textContent = fmt(Math.floor((Date.now() - startedAt) / 1000)); }, 500);
+      keepAwake(); mode('live');
+    }).catch(function () { failed('Microphone access was blocked. Allow the microphone for this site, or upload a recording instead.', null); });
+  });
+  $('stopBtn').addEventListener('click', function () { if (recorder && recorder.state !== 'inactive') recorder.stop(); });
+  $('uploadBtn').addEventListener('click', function () { $('file').click(); });
+  $('file').addEventListener('change', function () { var f = $('file').files[0]; $('file').value = ''; if (f) sendAudio(f); });
+
+  function keepAwake() {
+    if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
+  }
+  function releaseWake() { if (wake) { wake.release().catch(function () {}); wake = null; } }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && recorder && recorder.state === 'recording') keepAwake();
+  });
+  window.addEventListener('beforeunload', function (e) { if (recorder && recorder.state === 'recording') { e.preventDefault(); e.returnValue = ''; } });
+
+  function sendAudio(blob) {
+    lastBlob = blob; mode('busy');
+    $('busyMsg').textContent = 'Uploading…'; $('bar').value = 0; $('bar').removeAttribute('hidden');
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/process?consent=1&contactId=' + encodeURIComponent(contact.id));
+    x.setRequestHeader('x-vamos-passcode', passcode);
+    x.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+    x.upload.onprogress = function (e) { if (e.lengthComputable) { var p = Math.round(e.loaded / e.total * 100); $('bar').value = p; $('busyMsg').textContent = 'Uploading… ' + p + '%'; } };
+    x.upload.onload = function () { $('bar').setAttribute('hidden', ''); $('busyMsg').textContent = 'Transcribing and checking for macros. Long meetings can take a minute.'; };
+    x.onerror = function () { failed('The upload did not go through. Check your signal and try again.', blob); };
+    x.onload = function () {
+      var d = {}; try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status === 401) { askPass('Please enter the passcode again.'); mode('idle'); return; }
+      if (x.status !== 200) { failed(d.error || ('Something went wrong (' + x.status + ').'), blob); return; }
+      lastBlob = null; result(d);
+    };
+    x.send(blob);
+  }
+  function failed(msg, blob) {
+    mode('fail'); $('failMsg').textContent = msg;
+    show($('retry'), !!blob); show($('save'), !!blob);
+    if (blob) $('save').href = URL.createObjectURL(blob);
+    if (!blob) setTimeout(function () { mode('idle'); }, 6000);
+  }
+  $('retry').addEventListener('click', function () { if (lastBlob) sendAudio(lastBlob); });
+
+  // ---- result and macro confirmation
+  function note(parent, cls, text) { var d = document.createElement('div'); d.className = 'note ' + cls; d.textContent = text; parent.appendChild(d); return d; }
+  function result(d) {
+    show($('recordCard'), false); show($('consentCard'), false); show($('resultCard'), true);
+    $('resultTitle').textContent = 'Meeting processed';
+    $('saveNote').textContent = ''; $('macros').textContent = '';
+    if (d.noteError) note($('saveNote'), 'bad', 'The transcript could not be saved to the CRM: ' + d.noteError + ' Copy it from below.');
+    else note($('saveNote'), 'ok', 'Transcript saved as a note on ' + contact.name + '.');
+    $('transcript').textContent = d.transcript;
+    if (!d.macros.length) note($('macros'), 'info', 'No macro phrase was heard. No action taken.');
+    d.macros.forEach(function (m) {
+      var box = document.createElement('div'); box.className = 'macro';
+      var h = document.createElement('h3'); h.textContent = 'Run ' + m.label + ' for ' + contact.name + '?';
+      var p = document.createElement('div'); p.textContent = m.description;
+      var heard = document.createElement('div'); heard.className = 'heard'; heard.textContent = 'Heard: "…' + m.context + '…"';
+      var row = document.createElement('div'); row.className = 'row';
+      var yes = document.createElement('button'); yes.className = 'go'; yes.type = 'button'; yes.textContent = 'Yes, run it';
+      var no = document.createElement('button'); no.className = 'plain'; no.type = 'button'; no.textContent = 'No';
+      row.appendChild(yes); row.appendChild(no);
+      box.appendChild(h); box.appendChild(p); box.appendChild(heard); box.appendChild(row);
+      $('macros').appendChild(box);
+      no.addEventListener('click', function () { row.remove(); note(box, 'info', 'No action taken.'); });
+      yes.addEventListener('click', function () {
+        yes.disabled = true; no.disabled = true; yes.textContent = 'Starting…';
+        api('/api/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contactId: contact.id, macroId: m.id }) })
+          .then(function (r) { row.remove(); note(box, 'ok', 'Macro initiated. Tag ' + r.tag + ' was added to ' + contact.name + '.'); })
+          .catch(function (e) { yes.disabled = false; no.disabled = false; yes.textContent = 'Yes, run it'; note(box, 'bad', e.message); });
+      });
+    });
+    $('resultCard').scrollIntoView({ behavior: 'smooth' });
+  }
+  $('again').addEventListener('click', function () {
+    show($('resultCard'), false); show($('recordCard'), true); show($('consentCard'), true);
+    $('consent').checked = false; mode('idle'); ready(); window.scrollTo(0, 0);
+  });
+})();
+</script>
+</body>
+</html>

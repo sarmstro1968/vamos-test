@@ -1,0 +1,9 @@
+[
+  {
+    "id": "sales-bravo",
+    "label": "Sales Sequence Bravo",
+    "phrase": "initiate sales sequence bravo",
+    "tag": "vamos-sales-bravo",
+    "description": "Sends the terms of service email and the invoice to start services."
+  }
+]

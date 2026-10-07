@@ -1,0 +1,13 @@
+{
+  "name": "vamos-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VAMOS proof of concept: spoken macros in a meeting trigger CRM workflows",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
