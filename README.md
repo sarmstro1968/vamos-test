@@ -26,6 +26,7 @@ Set these in your hosting account. They never go in the code.
 | `GHL_LOCATION_ID` | Your GHL sub-account location ID |
 | `VAMOS_PASSCODE` | A passcode you invent. The page asks for it once per phone. |
 | `VAMOS_TIMEZONE` | Optional. Defaults to `America/Chicago`. |
+| `VAMOS_NEW_CONTACT_TAG` | Optional. Tag for contacts created in the app. Defaults to `added-via-vamos`. |
 
 ## Put it online
 
