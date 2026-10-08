@@ -1,7 +1,9 @@
-# VAMOS proof of concept
+# EXEQ proof of concept
+
+Formerly VAMOS. Setting names and CRM tags still use the `vamos` prefix so existing settings and workflows keep working.
 
 A phone web page plus a small server. The salesman picks a CRM contact, confirms
-consent, records (or uploads) a meeting, and VAMOS transcribes it, saves the
+consent, records (or uploads) a meeting, and EXEQ transcribes it, saves the
 transcript on the contact, and asks before running any macro it heard.
 
 ## Files

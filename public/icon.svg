@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
 <rect width="512" height="512" fill="#0B1424"/>
-<rect x="98" y="226" width="28" height="60" rx="14" fill="#3D5078"/>
-<rect x="146" y="191" width="28" height="130" rx="14" fill="#FFB37A"/>
-<rect x="194" y="146" width="28" height="220" rx="14" fill="#F0803C"/>
-<rect x="242" y="106" width="28" height="300" rx="14" fill="#F0803C"/>
-<rect x="290" y="146" width="28" height="220" rx="14" fill="#F0803C"/>
-<rect x="338" y="191" width="28" height="130" rx="14" fill="#FFB37A"/>
-<rect x="386" y="226" width="28" height="60" rx="14" fill="#3D5078"/>
+<g transform="translate(105 148) scale(7.2)">
+<rect x="2" y="11" width="4" height="8" rx="2" fill="#C7D0DD"/>
+<rect x="9" y="6" width="4" height="18" rx="2" fill="#FFB37A"/>
+<rect x="16" y="2" width="4" height="26" rx="2" fill="#F0803C"/>
+<rect x="23" y="7" width="4" height="16" rx="2" fill="#FFB37A"/>
+<path d="M31 9.5 L39.5 15 L31 20.5 Z" fill="#F0803C" stroke="#F0803C" stroke-width="1.5" stroke-linejoin="round"/>
+</g>
 </svg>

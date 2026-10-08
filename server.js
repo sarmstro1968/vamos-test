@@ -1,5 +1,5 @@
 'use strict';
-// VAMOS proof of concept. No dependencies: needs Node 18 or newer.
+// EXEQ proof of concept (formerly VAMOS). No dependencies: needs Node 18 or newer.
 // Keys are read from environment variables and never appear in this code.
 
 const http = require('http');
@@ -78,12 +78,12 @@ function splitText(text, size) {
 async function saveTranscript(contactId, result) {
   const when = new Date().toLocaleString('en-US', { timeZone: process.env.VAMOS_TIMEZONE || 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' });
   const mins = Math.max(1, Math.round(result.durationSec / 60));
-  const head = 'VAMOS meeting transcript\n' + when + ' · about ' + mins + ' min\nRecording consent confirmed in the app.\n\n';
+  const head = 'EXEQ meeting transcript\n' + when + ' · about ' + mins + ' min\nRecording consent confirmed in the app.\n\n';
   const chunks = splitText(result.formatted, NOTE_CHUNK);
   // Newest notes show first in the CRM, so save the last part first.
   for (let i = chunks.length - 1; i >= 0; i--) {
     const label = chunks.length > 1 ? '(part ' + (i + 1) + ' of ' + chunks.length + ')\n' : '';
-    await crm.addNote(contactId, (i === 0 ? head : 'VAMOS meeting transcript, continued\n') + label + chunks[i]);
+    await crm.addNote(contactId, (i === 0 ? head : 'EXEQ meeting transcript, continued\n') + label + chunks[i]);
   }
   return chunks.length;
 }
@@ -142,7 +142,7 @@ async function handleConfirm(req, res) {
   if (!macro) return send(res, 400, { error: 'Unknown macro.' });
   await crm.addTag(body.contactId, macro.tag);
   let noteError = '';
-  try { await crm.addNote(body.contactId, 'VAMOS: "' + macro.label + '" confirmed by the salesman. Tag ' + macro.tag + ' added.'); }
+  try { await crm.addNote(body.contactId, 'EXEQ: "' + macro.label + '" confirmed by the salesman. Tag ' + macro.tag + ' added.'); }
   catch (e) { noteError = e.message; }
   send(res, 200, { ok: true, label: macro.label, tag: macro.tag, noteError: noteError });
 }
@@ -185,4 +185,4 @@ const server = http.createServer(async function (req, res) {
 
 server.requestTimeout = 0;
 server.headersTimeout = 60000;
-server.listen(PORT, function () { console.log('VAMOS listening on port ' + PORT); });
+server.listen(PORT, function () { console.log('EXEQ listening on port ' + PORT); });
