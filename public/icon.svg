@@ -4,7 +4,7 @@
 <rect x="2" y="11" width="4" height="8" rx="2" fill="#C7D0DD"/>
 <rect x="9" y="6" width="4" height="18" rx="2" fill="#FFB37A"/>
 <rect x="16" y="2" width="4" height="26" rx="2" fill="#F0803C"/>
-<rect x="23" y="7" width="4" height="16" rx="2" fill="#FFB37A"/>
+<rect x="23" y="6" width="4" height="18" rx="2" fill="#FFB37A"/>
 <path d="M31 9.5 L39.5 15 L31 20.5 Z" fill="#F0803C" stroke="#F0803C" stroke-width="1.5" stroke-linejoin="round"/>
 </g>
 </svg>
