@@ -119,6 +119,12 @@ progress{width:100%;height:10px}
 <input id="file" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg" hidden>
 <p id="idleMsg" class="muted">Select a customer and confirm consent to begin.</p>
 <details><summary>Macros you can say</summary><ul id="macroList" class="muted"></ul></details>
+<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+<h3 style="margin:0 0 4px;font-size:16px">No recording needed?</h3>
+<p class="muted" style="margin:0 0 10px">Start a macro by hand for the selected customer.</p>
+<div id="manualList" class="row"></div>
+<div id="manualBox"></div>
+</div>
 </div>
 <div id="live" hidden>
 <div class="timer" aria-live="off"><span class="dot" aria-hidden="true"></span><span id="clock">00:00</span></div>
@@ -179,6 +185,7 @@ progress{width:100%;height:10px}
         li.textContent = '"' + m.phrase + '" runs ' + m.label + '. ' + m.description;
         ul.appendChild(li);
       });
+      buildManual(d.macros);
     });
   }
   function askPass(msg) {
@@ -252,11 +259,43 @@ progress{width:100%;height:10px}
       .then(function () { $('newSave').disabled = false; $('newSave').textContent = 'Save contact'; });
   });
 
+  // ---- start a macro by hand, with no recording
+  function buildManual(macros) {
+    var list = $('manualList'); list.textContent = ''; $('manualBox').textContent = '';
+    macros.forEach(function (m) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'plain'; b.textContent = 'Start ' + m.label; b.disabled = !contact;
+      b.addEventListener('click', function () { askManual(m); });
+      list.appendChild(b);
+    });
+  }
+  function askManual(m) {
+    var host = $('manualBox'); host.textContent = '';
+    var box = document.createElement('div'); box.className = 'macro';
+    var h = document.createElement('h3'); h.textContent = 'Run ' + m.label + ' for ' + contact.name + '?';
+    var p = document.createElement('div'); p.textContent = m.description;
+    var row = document.createElement('div'); row.className = 'row'; row.style.marginTop = '12px';
+    var yes = document.createElement('button'); yes.className = 'go'; yes.type = 'button'; yes.textContent = 'Yes, run it';
+    var no = document.createElement('button'); no.className = 'plain'; no.type = 'button'; no.textContent = 'No';
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(h); box.appendChild(p); box.appendChild(row); host.appendChild(box);
+    no.addEventListener('click', function () { host.textContent = ''; });
+    yes.addEventListener('click', function () {
+      var who = contact;
+      yes.disabled = true; no.disabled = true; yes.textContent = 'Starting…';
+      api('/api/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contactId: who.id, macroId: m.id, manual: true }) })
+        .then(function (r) { row.remove(); note(box, 'ok', 'Macro initiated. Tag ' + r.tag + ' was added to ' + who.name + '.'); })
+        .catch(function (e) { yes.disabled = false; no.disabled = false; yes.textContent = 'Yes, run it'; note(box, 'bad', e.message); });
+    });
+  }
+
   // ---- step 2: consent
   $('consent').addEventListener('change', ready);
   function ready() {
     var ok = !!contact && $('consent').checked;
     $('start').disabled = !ok; $('uploadBtn').disabled = !ok;
+    Array.prototype.forEach.call(document.querySelectorAll('#manualList button'), function (b) { b.disabled = !contact; });
+    if (!contact) $('manualBox').textContent = '';
     $('idleMsg').textContent = ok ? 'Ready. Say a macro phrase during the meeting to queue an automation.'
       : 'Select a customer and confirm consent to begin.';
   }

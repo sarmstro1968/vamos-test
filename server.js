@@ -142,7 +142,8 @@ async function handleConfirm(req, res) {
   if (!macro) return send(res, 400, { error: 'Unknown macro.' });
   await crm.addTag(body.contactId, macro.tag);
   let noteError = '';
-  try { await crm.addNote(body.contactId, 'EXEQ: "' + macro.label + '" confirmed by the salesman. Tag ' + macro.tag + ' added.'); }
+  const how = body.manual === true ? 'started by hand, with no recording' : 'confirmed by the salesman';
+  try { await crm.addNote(body.contactId, 'EXEQ: "' + macro.label + '" ' + how + '. Tag ' + macro.tag + ' added.'); }
   catch (e) { noteError = e.message; }
   send(res, 200, { ok: true, label: macro.label, tag: macro.tag, noteError: noteError });
 }
