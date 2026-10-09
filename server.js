@@ -11,11 +11,13 @@ const { Readable } = require('stream');
 const crm = require('./lib/crm-ghl');
 const { transcribe } = require('./lib/transcribe-deepgram');
 const { findMacros } = require('./lib/macros');
+const { parseCommand, rankContacts, commandTerms } = require('./lib/command');
 
 const PORT = process.env.PORT || 3000;
 const PASSCODE = process.env.VAMOS_PASSCODE || '';
 const MAX_AUDIO_BYTES = 400 * 1024 * 1024;
 const NOTE_CHUNK = 50000;
+const MAX_COMMAND_BYTES = 10 * 1024 * 1024;
 
 const MACROS = JSON.parse(fs.readFileSync(path.join(__dirname, 'macros.json'), 'utf8'));
 const INDEX = fs.readFileSync(path.join(__dirname, 'index.html'));
@@ -136,13 +138,54 @@ async function handleNewContact(req, res) {
   send(res, 200, result);
 }
 
+// Finds CRM contacts for a spoken name. Tries the full name first, then each
+// name on its own (last name first) in case one word was misheard.
+async function findContacts(name) {
+  let found = await crm.searchContacts(name, 10);
+  if (!found.length) {
+    const seen = new Set();
+    const words = name.split(' ').filter(function (w) { return w.length >= 3; }).reverse();
+    for (const w of words) {
+      for (const c of await crm.searchContacts(w, 25)) {
+        if (!seen.has(c.id)) { seen.add(c.id); found.push(c); }
+      }
+    }
+  }
+  const ranked = rankContacts(name, found).filter(function (c) { return c.score >= 0.6; }).slice(0, 6);
+  // Only pick for the salesman when one contact is a clear fit.
+  const clear = ranked.length && ranked[0].score >= 0.85 && !(ranked[1] && ranked[1].score >= 0.85);
+  return { contacts: ranked, best: clear ? ranked[0].id : null };
+}
+
+// "Send Ian Armstrong the onboarding sequence": spoken (audio) or typed (JSON {text}).
+async function handleCommand(req, res) {
+  let text;
+  if (String(req.headers['content-type'] || '').indexOf('application/json') === 0) {
+    text = String((await readJson(req)).text || '').trim().slice(0, 300);
+  } else {
+    if (Number(req.headers['content-length'] || 0) > MAX_COMMAND_BYTES) return send(res, 413, { error: 'That clip is too long. Keep voice commands short.' });
+    const terms = [];
+    MACROS.forEach(function (m) { commandTerms(m).forEach(function (t) { terms.push(t); }); });
+    text = (await transcribe(Readable.toWeb(req), req.headers['content-type'], terms)).formatted;
+  }
+  if (!text) return send(res, 422, { error: 'I didn\'t catch that. Try again a little closer to the phone.' });
+
+  const parsed = parseCommand(text, MACROS);
+  const out = { heard: parsed.heard, name: parsed.name, macro: null, contacts: [], best: null };
+  if (parsed.macro) out.macro = { id: parsed.macro.id, label: parsed.macro.label, description: parsed.macro.description || '' };
+  if (parsed.macro && parsed.name.length >= 2) Object.assign(out, await findContacts(parsed.name));
+  send(res, 200, out);
+}
+
 async function handleConfirm(req, res) {
   const body = await readJson(req);
   const macro = MACROS.find(function (m) { return m.id === body.macroId; });
   if (!macro) return send(res, 400, { error: 'Unknown macro.' });
   await crm.addTag(body.contactId, macro.tag);
   let noteError = '';
-  const how = body.manual === true ? 'started by hand, with no recording' : 'confirmed by the salesman';
+  const said = String(body.heard || '').replace(/["\s]+/g, ' ').trim().slice(0, 200);
+  const how = body.via === 'voice' ? 'started by voice command' + (said ? ' ("' + said + '")' : '')
+    : body.manual === true ? 'started by hand, with no recording' : 'confirmed by the salesman';
   try { await crm.addNote(body.contactId, 'EXEQ: "' + macro.label + '" ' + how + '. Tag ' + macro.tag + ' added.'); }
   catch (e) { noteError = e.message; }
   send(res, 200, { ok: true, label: macro.label, tag: macro.tag, noteError: noteError });
@@ -175,6 +218,7 @@ const server = http.createServer(async function (req, res) {
     }
     if (req.method === 'POST' && url.pathname === '/api/contacts') return await handleNewContact(req, res);
     if (req.method === 'POST' && url.pathname === '/api/process') return await handleProcess(req, res, url);
+    if (req.method === 'POST' && url.pathname === '/api/command') return await handleCommand(req, res);
     if (req.method === 'POST' && url.pathname === '/api/confirm') return await handleConfirm(req, res);
     return send(res, 404, { error: 'Not found' });
   } catch (e) {

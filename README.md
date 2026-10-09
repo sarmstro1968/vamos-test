@@ -6,6 +6,12 @@ A phone web page plus a small server. The salesman picks a CRM contact, confirms
 consent, records (or uploads) a meeting, and EXEQ transcribes it, saves the
 transcript on the contact, and asks before running any macro it heard.
 
+**Quick command:** tap "Tap to speak" and say who and what, for example
+"Send Ian Armstrong the onboarding sequence." EXEQ finds the macro and the
+contact in the CRM and asks before it runs. If several contacts match, you pick
+one. Commands can also be typed. The clip is only used to read the command;
+nothing is saved except a note on the contact once you say yes.
+
 ## Files
 
 | File | What it is |
@@ -16,6 +22,7 @@ transcript on the contact, and asks before running any macro it heard.
 | `lib/crm-ghl.js` | GHL connector (swap to support another CRM) |
 | `lib/transcribe-deepgram.js` | Deepgram connector |
 | `lib/macros.js` | Fuzzy phrase matching |
+| `lib/command.js` | Quick commands: finds the macro and the person's name |
 
 ## Settings (environment variables)
 
@@ -45,8 +52,14 @@ Any host that runs a Node server works the same way.
 
 ## In GHL
 
-Create a workflow with the trigger "Contact Tag", filter "Tag Added" =
-`vamos-sales-bravo`, then add your actions (terms of service email, invoice).
+For each macro, create a workflow with the trigger "Contact Tag", filter
+"Tag Added" = the macro's tag, then add your actions. Make "Remove tag" the last
+step so the macro can run again for the same contact later.
+
+| Macro | Tag | Workflow |
+|---|---|---|
+| Sales Sequence Bravo | `vamos-sales-bravo` | Terms of service email and invoice |
+| Onboarding Sequence | `vamos-onboarding` | Welcome email and onboarding instructions (build this one) |
 
 ## Add a macro
 
@@ -54,9 +67,15 @@ Add a block to `macros.json` and build a GHL workflow on its tag:
 
 ```json
 { "id": "hire-alpha", "label": "Hiring Sequence Alpha",
-  "phrase": "initiate hiring sequence alpha", "tag": "vamos-hire-alpha",
+  "phrase": "initiate hiring sequence alpha",
+  "commands": ["hiring sequence alpha", "offer letter"],
+  "tag": "vamos-hire-alpha",
   "description": "Sends the offer letter." }
 ```
+
+`phrase` is what to say during a recorded meeting. `commands` are the short
+names a quick command listens for ("Send Dana Whitfield the offer letter").
+If you leave `commands` out, the label is used.
 
 ## What this version does not do yet
 

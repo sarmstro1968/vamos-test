@@ -55,6 +55,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 pre{white-space:pre-wrap;word-wrap:break-word;font:14px/1.5 system-ui,sans-serif;margin:10px 0 0;max-height:320px;overflow:auto}
 summary{cursor:pointer;font-weight:600;padding:6px 0}
 progress{width:100%;height:10px}
+.timer.small{font-size:30px;margin:4px 0 10px}
+.cmd-row{display:flex;gap:8px}.cmd-row input{flex:1 1 auto}.cmd-row button{flex:none}
+.sub{color:var(--muted);font-size:14px;margin:2px 0 8px;overflow-wrap:anywhere}
+.link{background:none;color:var(--crm);padding:8px 0;min-height:0;font-weight:600;text-decoration:underline}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -76,6 +80,25 @@ progress{width:100%;height:10px}
 </section>
 
 <div id="app" hidden>
+
+<section class="card" id="cmdCard">
+<p class="step">Quick command</p>
+<h2>Say who and what</h2>
+<p class="muted" style="margin-top:0">For example: "Send Ian Armstrong the onboarding sequence." No meeting recording needed.</p>
+<div id="cmdIdle" class="row"><button id="cmdStart" class="go" type="button">Tap to speak</button></div>
+<div id="cmdLive" hidden>
+<div class="timer small" aria-live="off"><span class="dot" aria-hidden="true"></span><span id="cmdClock">0:15</span></div>
+<div class="row"><button id="cmdStop" class="stop" type="button">Done speaking</button></div>
+</div>
+<p id="cmdStatus" class="muted" role="status"></p>
+<details id="cmdTypeBox"><summary>Type it instead</summary>
+<form id="cmdForm" class="cmd-row" style="margin-top:8px">
+<input id="cmdText" type="text" aria-label="Type a command" autocomplete="off" placeholder="Send Ian Armstrong onboarding">
+<button class="go" type="submit">Go</button>
+</form>
+</details>
+<div id="cmdOut"></div>
+</section>
 
 <section class="card" id="contactCard">
 <p class="step">Step 1</p>
@@ -161,6 +184,7 @@ progress{width:100%;height:10px}
   var $ = function (id) { return document.getElementById(id); };
   var passcode = '';
   try { passcode = localStorage.getItem('vamos_pass') || ''; } catch (e) {}
+  var macroNames = [];
   var contact = null, recorder = null, chunks = [], stream = null, tick = null, startedAt = 0, wake = null, lastBlob = null;
 
   function show(el, on) { el.hidden = !on; }
@@ -185,6 +209,7 @@ progress{width:100%;height:10px}
         li.textContent = '"' + m.phrase + '" runs ' + m.label + '. ' + m.description;
         ul.appendChild(li);
       });
+      macroNames = d.macros.map(function (m) { return m.label; });
       buildManual(d.macros);
     });
   }
@@ -287,6 +312,151 @@ progress{width:100%;height:10px}
         .then(function (r) { row.remove(); note(box, 'ok', 'Macro initiated. Tag ' + r.tag + ' was added to ' + who.name + '.'); })
         .catch(function (e) { yes.disabled = false; no.disabled = false; yes.textContent = 'Yes, run it'; note(box, 'bad', e.message); });
     });
+  }
+
+  // ---- quick voice command: "Send Ian Armstrong the onboarding sequence"
+  var cmdRec = null, cmdStream = null, cmdTick = null, cmdBusy = false;
+  function cmdMode(listening) { show($('cmdIdle'), !listening); show($('cmdLive'), listening); }
+  function cmdSay(text) { $('cmdStatus').textContent = text || ''; }
+  $('cmdStart').addEventListener('click', function () {
+    if (cmdBusy) return;
+    if (!navigator.mediaDevices || !window.MediaRecorder) { cmdSay('This browser cannot record. Use "Type it instead".'); $('cmdTypeBox').open = true; return; }
+    $('cmdOut').textContent = ''; cmdSay('');
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+      cmdStream = s;
+      var parts = [];
+      var type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].filter(function (t) { return MediaRecorder.isTypeSupported(t); })[0];
+      cmdRec = type ? new MediaRecorder(s, { mimeType: type }) : new MediaRecorder(s);
+      cmdRec.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
+      cmdRec.onstop = function () {
+        clearInterval(cmdTick); cmdStream.getTracks().forEach(function (t) { t.stop(); }); cmdMode(false);
+        var blob = new Blob(parts, { type: cmdRec.mimeType || 'audio/webm' });
+        if (!blob.size) { cmdSay('Nothing was recorded. Try again.'); return; }
+        runCommand(blob);
+      };
+      cmdRec.start(500);
+      var left = 15; $('cmdClock').textContent = '0:15';
+      cmdTick = setInterval(function () {
+        left--; $('cmdClock').textContent = '0:' + (left < 10 ? '0' : '') + Math.max(left, 0);
+        if (left <= 0 && cmdRec.state !== 'inactive') cmdRec.stop();
+      }, 1000);
+      cmdMode(true); $('cmdStop').focus();
+    }).catch(function () { cmdSay('Microphone access was blocked. Allow the microphone for this site, or type the command instead.'); $('cmdTypeBox').open = true; });
+  });
+  $('cmdStop').addEventListener('click', function () { if (cmdRec && cmdRec.state !== 'inactive') cmdRec.stop(); });
+  $('cmdForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var t = $('cmdText').value.trim();
+    if (t.length < 3 || cmdBusy) return;
+    $('cmdOut').textContent = ''; runCommand(t);
+  });
+
+  function runCommand(input) {
+    cmdBusy = true; $('cmdStart').disabled = true;
+    cmdSay(typeof input === 'string' ? 'Looking that up…' : 'Listening back and looking that up…');
+    var opts = typeof input === 'string'
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input }) }
+      : { method: 'POST', headers: { 'Content-Type': input.type || 'application/octet-stream' }, body: input };
+    api('/api/command', opts).then(function (d) { cmdSay(''); showCommand(d); })
+      .catch(function (e) { if (e.status === 401) askPass('Please enter the passcode again.'); else cmdSay(e.message); })
+      .then(function () { cmdBusy = false; $('cmdStart').disabled = false; });
+  }
+
+  function contactLine(c) { return [c.email, c.phone, c.company].filter(Boolean).join(' · ') || 'No email or phone on file'; }
+
+  function showCommand(d) {
+    var out = $('cmdOut'); out.textContent = '';
+    var heard = document.createElement('div'); heard.className = 'heard'; heard.textContent = 'Heard: "' + d.heard + '"';
+    out.appendChild(heard);
+    if (!d.macro) {
+      note(out, 'bad', 'I did not hear a macro name. Try one of: ' + macroNames.join(', ') + '.');
+      return;
+    }
+    if (!d.name) {
+      note(out, 'info', 'Who is ' + d.macro.label + ' for? Search below, or say it again with the name.');
+      cmdSearch(out, d, '');
+      return;
+    }
+    var best = d.best && d.contacts.filter(function (c) { return c.id === d.best; })[0];
+    if (best) {
+      cmdConfirm(out, d, best);
+      if (d.contacts.length > 1) {
+        var more = document.createElement('button'); more.type = 'button'; more.className = 'link'; more.textContent = 'Not them? Show other matches';
+        more.addEventListener('click', function () { out.textContent = ''; out.appendChild(heard); cmdChoose(out, d); });
+        out.appendChild(more);
+      }
+    } else if (d.contacts.length) {
+      cmdChoose(out, d);
+    } else {
+      note(out, 'info', 'No contact named "' + d.name + '" was found. Search for them, or add them in Step 1 below.');
+      cmdSearch(out, d, d.name);
+    }
+  }
+
+  // Several possible people: let the salesman pick, then confirm.
+  function cmdChoose(out, d) {
+    var h = document.createElement('h3'); h.style.margin = '6px 0 0'; h.style.fontSize = '17px';
+    h.textContent = 'Which ' + d.name.replace(/\b[a-z]/g, function (x) { return x.toUpperCase(); }) + '?';
+    out.appendChild(h);
+    var ul = document.createElement('ul'); ul.className = 'list';
+    d.contacts.forEach(function (c) { ul.appendChild(contactButton(c, function () { out.textContent = ''; cmdConfirm(out, d, c); })); });
+    out.appendChild(ul);
+    var other = document.createElement('button'); other.type = 'button'; other.className = 'link'; other.textContent = 'Someone else';
+    other.addEventListener('click', function () { other.remove(); cmdSearch(out, d, ''); });
+    out.appendChild(other);
+  }
+
+  function contactButton(c, onPick) {
+    var li = document.createElement('li'), b = document.createElement('button'), s = document.createElement('small');
+    b.type = 'button'; b.textContent = c.name; s.textContent = contactLine(c);
+    b.appendChild(s); b.addEventListener('click', onPick); li.appendChild(b); return li;
+  }
+
+  // Name not found or not said: a small contact search inside the card.
+  function cmdSearch(out, d, start) {
+    var wrap = document.createElement('div'); wrap.style.marginTop = '10px';
+    var input = document.createElement('input'); input.type = 'search'; input.placeholder = 'Search contacts'; input.value = start; input.setAttribute('aria-label', 'Search contacts');
+    var msg = document.createElement('p'); msg.className = 'muted'; msg.setAttribute('role', 'status');
+    var ul = document.createElement('ul'); ul.className = 'list';
+    wrap.appendChild(input); wrap.appendChild(msg); wrap.appendChild(ul); out.appendChild(wrap);
+    var timer = null;
+    function go() {
+      var q = input.value.trim(); ul.textContent = '';
+      if (q.length < 2) { msg.textContent = ''; return; }
+      msg.textContent = 'Searching…';
+      api('/api/contacts?q=' + encodeURIComponent(q)).then(function (r) {
+        if (input.value.trim() !== q) return;
+        msg.textContent = r.contacts.length ? '' : 'No contacts found.';
+        r.contacts.forEach(function (c) { ul.appendChild(contactButton(c, function () { out.textContent = ''; cmdConfirm(out, d, c); })); });
+      }).catch(function (e) { msg.textContent = e.message; });
+    }
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(go, 300); });
+    if (start.length >= 2) go(); else input.focus();
+  }
+
+  function cmdConfirm(out, d, c) {
+    var box = document.createElement('div'); box.className = 'macro';
+    var h = document.createElement('h3'); h.textContent = 'Run ' + d.macro.label + ' for ' + c.name + '?';
+    var sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = contactLine(c);
+    var p = document.createElement('div'); p.textContent = d.macro.description;
+    var row = document.createElement('div'); row.className = 'row'; row.style.marginTop = '12px';
+    var yes = document.createElement('button'); yes.className = 'go'; yes.type = 'button'; yes.textContent = 'Yes, run it';
+    var no = document.createElement('button'); no.className = 'plain'; no.type = 'button'; no.textContent = 'No';
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(h); box.appendChild(sub); box.appendChild(p); box.appendChild(row); out.appendChild(box);
+    no.addEventListener('click', function () { out.textContent = ''; cmdSay('Cancelled. Nothing was sent.'); });
+    yes.addEventListener('click', function () {
+      yes.disabled = true; no.disabled = true; yes.textContent = 'Starting…';
+      api('/api/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contactId: c.id, macroId: d.macro.id, via: 'voice', heard: d.heard }) })
+        .then(function (r) {
+          row.remove();
+          Array.prototype.forEach.call(out.querySelectorAll('.link'), function (b) { b.remove(); });
+          note(box, 'ok', 'Macro initiated. Tag ' + r.tag + ' was added to ' + c.name + '.');
+          $('cmdText').value = '';
+        })
+        .catch(function (e) { yes.disabled = false; no.disabled = false; yes.textContent = 'Yes, run it'; note(box, 'bad', e.message); });
+    });
+    yes.focus();
   }
 
   // ---- step 2: consent

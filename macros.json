@@ -3,7 +3,16 @@
     "id": "sales-bravo",
     "label": "Sales Sequence Bravo",
     "phrase": "initiate sales sequence bravo",
+    "commands": ["sales sequence bravo", "bravo sequence", "sequence bravo", "bravo"],
     "tag": "vamos-sales-bravo",
     "description": "Sends the terms of service email and the invoice to start services."
+  },
+  {
+    "id": "onboarding",
+    "label": "Onboarding Sequence",
+    "phrase": "initiate onboarding sequence",
+    "commands": ["onboarding sequence", "onboarding"],
+    "tag": "vamos-onboarding",
+    "description": "Sends the welcome email and onboarding instructions."
   }
 ]
